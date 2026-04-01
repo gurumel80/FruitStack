@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fruit Stack: Perfect Fit</title>
+    <script src="https://cdn.jsdelivr.net/npm/poly-decomp@0.3.0/build/decomp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #E0F7FA; font-family: 'Bubblegum Sans', cursive; overflow: hidden; touch-action: none; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; z-index: 10; }
+        #height { font-size: 60px; color: #FF5252; text-shadow: 3px 3px 0 #fff; }
+        #lives { font-size: 30px; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div id="height">0.0 cm</div>
+    <div id="lives">❤️❤️❤️❤️❤️</div>
+</div>
+
+<script>
+// Required for concave shapes (Bananas/Melons)
+Matter.Common.setDecomp(decomp);
+const { Engine, Render, Runner, Bodies, Composite, Body, Events, Vertices } = Matter;
+
+const engine = Engine.create();
+const world = engine.world;
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+let lives = 5;
+let highestY = height - 80;
+let currentFruit = null;
+let activeFruits = [];
+
+const render = Render.create({
+    element: document.body,
+    engine: engine,
+    options: { width, height, wireframes: false, background: 'transparent' }
+});
+
+Render.run(render);
+Runner.run(Runner.create(), engine);
+
+// --- Precise Shape Definitions ---
+// These coordinates are normalized. We scale them to the fruit size.
+const SHAPES = {
+    '🍉': [ {x:0, y:0}, {x:100, y:0}, {x:90, y:35}, {x:70, y:60}, {x:30, y:60}, {x:10, y:35} ], // Semi-circle
+    '🍌': [ {x:0, y:20}, {x:30, y:0}, {x:70, y:0}, {x:100, y:20}, {x:80, y:40}, {x:50, y:30}, {x:20, y:40} ], // Curved "C"
+    '🍇': [ {x:20, y:0}, {x:80, y:0}, {x:100, y:40}, {x:50, y:100}, {x:0, y:40} ], // Tapered bunch
+    '🍎': [ {x:30, y:0}, {x:70, y:0}, {x:100, y:30}, {x:100, y:70}, {x:70, y:100}, {x:30, y:100}, {x:0, y:70}, {x:0, y:30} ], // Octagon apple
+    '🍍': [ {x:20, y:0}, {x:80, y:0}, {x:100, y:30}, {x:100, y:80}, {x:80, y:100}, {x:20, y:100}, {x:0, y:80}, {x:0, y:30} ]
+};
+
+function createFruit(x, y) {
+    const emojis = Object.keys(SHAPES);
+    const char = emojis[Math.floor(Math.random() * emojis.length)];
+    const size = char === '🍉' ? 1.2 : (char === '🍌' ? 1.1 : 0.8); // Scaling factors
+    
+    // Scale the custom vertices to the gameplay size
+    const vSet = SHAPES[char].map(p => ({ x: p.x * size, y: p.y * size }));
+    
+    // fromVertices handles the "Concave" shapes like the Banana curve
+    const body = Bodies.fromVertices(x, y, [vSet], {
+        restitution: 0.1,
+        friction: 0.9,
+        density: 0.005,
+        render: { visible: false } 
+    });
+
+    body.emoji = char;
+    body.displaySize = size * 60;
+    body.isLocked = false;
+    body.flash = 0;
+    return body;
+}
+
+// --- Bowl ---
+const bowlBase = Bodies.rectangle(width/2, height - 40, 240, 20, { isStatic: true, render: { visible: false } });
+const bowlL = Bodies.rectangle(width/2 - 130, height - 100, 20, 150, { isStatic: true, angle: -0.4, render: { visible: false } });
+const bowlR = Bodies.rectangle(width/2 + 130, height - 100, 20, 150, { isStatic: true, angle: 0.4, render: { visible: false } });
+Composite.add(world, [bowlBase, bowlL, bowlR]);
+
+function spawn() {
+    currentFruit = createFruit(width / 2, 80);
+    Body.setStatic(currentFruit, true);
+    Composite.add(world, currentFruit);
+}
+
+// --- Drawing & Game Loop ---
+Events.on(render, 'afterRender', () => {
+    const ctx = render.context;
+
+    // Bowl Visual
+    ctx.fillStyle = '#FF80AB';
+    ctx.beginPath();
+    ctx.arc(width/2, height - 70, 150, 0, Math.PI, false);
+    ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.stroke();
+
+    // Fruit Visual
+    Composite.allBodies(world).forEach(body => {
+        if (body.emoji) {
+            ctx.save();
+            ctx.translate(body.position.x, body.position.y);
+            ctx.rotate(body.angle);
+            
+            if (body.flash > 0) {
+                ctx.shadowBlur = body.flash;
+                ctx.shadowColor = "white";
+                body.flash -= 2;
+            }
+
+            ctx.font = `${body.displaySize * 1.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(body.emoji, 0, 0);
+            ctx.restore();
+        }
+    });
+});
+
+Events.on(engine, 'afterUpdate', () => {
+    activeFruits.forEach((f, i) => {
+        if (f.speed < 0.2 && f.angularSpeed < 0.01 && f.position.y < height - 80) {
+            if (!f.isLocked) {
+                f.isLocked = true;
+                f.flash = 40;
+                Body.setStatic(f, true);
+                activeFruits.splice(i, 1);
+                
+                if (f.bounds.min.y < highestY) {
+                    highestY = f.bounds.min.y;
+                    document.getElementById('height').innerText = `${((height - 80 - highestY) / 10).toFixed(1)} cm`;
+                }
+            }
+        }
+        if (f.position.y > height + 100) {
+            Composite.remove(world, f);
+            activeFruits.splice(i, 1);
+            lives--;
+            document.getElementById('lives').innerText = "❤️".repeat(lives);
+            if (lives <= 0) location.reload();
+        }
+    });
+});
+
+const drop = () => {
+    if (!currentFruit) return;
+    Body.setStatic(currentFruit, false);
+    activeFruits.push(currentFruit);
+    currentFruit = null;
+    setTimeout(spawn, 1200);
+};
+
+window.addEventListener('mousemove', (e) => { if (currentFruit) Body.setPosition(currentFruit, { x: e.clientX, y: 80 }); });
+window.addEventListener('mousedown', drop);
+window.addEventListener('touchstart', (e) => { e.preventDefault(); drop(); });
+
+spawn();
+</script>
+</body>
+</html>
