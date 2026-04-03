@@ -392,24 +392,26 @@ Events.on(render, 'afterRender', () => {
     const ctx = render.context;
     if (!ctx) return;
 
-    // 1. Draw the back of the bowl (or the full bowl background)
-    if (assets['bowl'] && assets['bowl'].complete) {
-        ctx.drawImage(assets['bowl'], width/2 - 150, height - 160, 300, 150);
+    const bowlX = width / 2 - 150;
+    const bowlY = height - 160;
+
+    // 1. Draw the back of the bowl first
+    if (assets['bowl']?.complete) {
+        ctx.drawImage(assets['bowl'], bowlX, bowlY, 300, 150);
     }
 
-    // 2. Draw all the fruits
+    // 2. Draw all the fruits (This includes the currently held one)
     Composite.allBodies(world).forEach(body => {
         if (body.fruitType) {
-            // Safety check: Don't attempt to draw bodies with corrupted physics data
             if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y)) return;
 
             ctx.save();
             ctx.translate(body.position.x, body.position.y);
             ctx.rotate(body.angle);
             
-            if (!DEBUG_MODE) { // Only draw custom image if not in debug mode
+            if (!DEBUG_MODE) { 
                 const img = assets[body.fruitType];
-                if (img && img.complete && img.naturalWidth > 0) {
+                if (img?.complete && img.naturalWidth > 0) {
                     const ratio = img.naturalWidth / img.naturalHeight;
                     const drawHeight = body.displaySize;
                     const drawWidth = Number.isFinite(ratio) ? drawHeight * ratio : drawHeight;
@@ -421,11 +423,10 @@ Events.on(render, 'afterRender', () => {
                     }
                     ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
                     
-                    if (body.flash > 10 && assets['sparkles'] && assets['sparkles'].complete) {
+                    if (body.flash > 10 && assets['sparkles']?.complete) {
                         ctx.drawImage(assets.sparkles, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
                     }
                 } else {
-                    // Fallback: If image asset is missing or broken, draw a placeholder circle
                     ctx.beginPath();
                     ctx.arc(0, 0, body.displaySize / 3, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(255, 82, 82, 0.5)';
@@ -437,9 +438,9 @@ Events.on(render, 'afterRender', () => {
         }
     });
 
-    // 3. Draw the front rim of the bowl (The "Overhang")
-    if (assets['bowl_front'] && assets['bowl_front'].complete) {
-        ctx.drawImage(assets['bowl_front'], width/2 - 150, height - 160, 300, 150);
+    // 3. Draw the front rim of the bowl LAST so it appears in front of the fruit
+    if (assets['bowl_front']?.complete) {
+        ctx.drawImage(assets['bowl_front'], bowlX, bowlY, 300, 150);
     }
 });
 
