@@ -8,160 +8,589 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #E0F7FA; font-family: 'Bubblegum Sans', cursive; overflow: hidden; touch-action: none; }
-        #ui { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; z-index: 10; }
-        #height { font-size: 60px; color: #FF5252; text-shadow: 3px 3px 0 #fff; }
-        #lives { font-size: 30px; }
+        body { margin: 0; background: #FFF9C4 url('background.png') no-repeat center center fixed; background-size: cover; font-family: 'Bubblegum Sans', cursive; overflow: hidden; touch-action: none; }
         canvas { display: block; }
+        #title-container { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; }
+        #title-img { height: 150px; }
+        #height-container { position: absolute; bottom: 20px; left: 20px; z-index: 10; pointer-events: none; }
+        #height { font-size: 70px; color: #FF5252; text-shadow: 4px 4px 0 #fff; margin: 0; }
+        #status-container { position: absolute; top: 20px; right: 20px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+        #next-container { background: rgba(255,255,255,0.7); padding: 15px; border-radius: 20px; border: 4px solid #fff; text-align: center; margin-bottom: 10px; }
+        #next-label { font-size: 20px; color: #FF80AB; margin-bottom: 5px; }
+        #next-canvas { width: 60px; height: 60px; }
+        #lives { font-size: 35px; text-shadow: 2px 2px 0 #fff; }
+        .flower { position: absolute; pointer-events: none; z-index: 1; width: 100px; opacity: 0.8; }
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #FFF9C4 url('background.png') center/cover; z-index: 100; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 50px; pointer-events: auto; padding: 40px; box-sizing: border-box; }
+        #splash-img { max-height: 85vh; max-width: 60vw; border: 12px solid #fff; border-radius: 40px; box-shadow: 0 15px 30px rgba(0,0,0,0.3); }
+        .splash-buttons { display: flex; flex-direction: column; gap: 20px; }
+        #game-over, #leaderboard-screen, #how-to-play-screen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 40px; border-radius: 30px; border: 8px solid #FF5252; text-align: center; display: none; pointer-events: auto; z-index: 110; min-width: 320px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        #leaderboard-screen h1 { color: #4CAF50; margin-top: 0; font-size: 40px; }
+        #leaderboard-list { margin: 25px 0; font-size: 26px; text-align: left; }
+        .leaderboard-entry { display: flex; justify-content: space-between; border-bottom: 2px dashed #eee; padding: 8px 0; }
+        #game-over h1 { color: #FF5252; font-size: 50px; margin: 0; }
+        #game-over p { font-size: 30px; margin: 10px 0; }
+        #player-name { padding: 10px; font-size: 20px; border-radius: 10px; border: 2px solid #FF5252; font-family: 'Bubblegum Sans'; width: 80%; margin-bottom: 10px; outline: none; }
+        #high-score-msg { color: #4CAF50; font-size: 24px; margin: 10px 0; display: none; }
+        button { background: #FF5252; color: white; border: none; padding: 15px 30px; font-family: 'Bubblegum Sans', cursive; font-size: 25px; border-radius: 50px; cursor: pointer; box-shadow: 0 5px 0 #c62828; }
+        button:active { transform: translateY(3px); box-shadow: 0 2px 0 #c62828; }
+        #how-to-play-screen h1 { color: #FF80AB; margin-top: 0; }
+        #how-to-play-screen ul { text-align: left; font-size: 24px; line-height: 1.6; margin: 20px 0; padding-left: 20px; color: #333; }
+        .btn-alt { background: #FF80AB; box-shadow: 0 5px 0 #c2185b; }
+        .btn-alt:active { box-shadow: 0 2px 0 #c2185b; }
     </style>
 </head>
 <body>
 
-<div id="ui">
+<img src="flower.png" class="flower" style="bottom: 10px; left: 10px;">
+<img src="flower2.png" class="flower" style="bottom: 10px; right: 10px;">
+
+<div id="title-container"><img src="title.png" id="title-img"></div>
+
+<div id="height-container">
     <div id="height">0.0 cm</div>
-    <div id="lives">❤️❤️❤️❤️❤️</div>
+</div>
+
+<div id="status-container">
+    <div id="next-container">
+        <div id="next-label">NEXT</div>
+        <canvas id="next-canvas" width="100" height="100"></canvas>
+    </div>
+    <div id="status-stats">
+        <div id="lives">❤️❤️❤️❤️❤️</div>
+    </div>
+</div>
+
+<div id="splash-screen">
+    <img src="splash.png" id="splash-img">
+    <div class="splash-buttons">
+        <button id="btn-start" disabled>LOADING...</button>
+        <button id="btn-how" class="btn-alt">HOW TO PLAY</button>
+        <button id="btn-leaderboard" class="btn-alt" style="background: #4CAF50; box-shadow: 0 5px 0 #2e7d32;">LEADERBOARD</button>
+    </div>
+</div>
+
+<div id="leaderboard-screen">
+    <h1>HIGH SCORES</h1>
+    <div id="leaderboard-list"></div>
+    <button onclick="document.getElementById('leaderboard-screen').style.display='none'" style="background: #888; box-shadow: 0 5px 0 #555;">BACK</button>
+</div>
+
+<div id="how-to-play-screen">
+    <h1>HOW TO PLAY</h1>
+    <ul>
+        <li>🍎 Move mouse or finger to aim</li>
+        <li>🍓 Click or tap to drop fruit</li>
+        <li>🍍 Stack them high in the bowl!</li>
+        <li>💔 Don't let 5 fruits fall out</li>
+    </ul>
+    <button onclick="document.getElementById('how-to-play-screen').style.display='none'" class="btn-alt">GOT IT!</button>
+</div>
+
+<div id="game-over">
+    <h1>GAME OVER!</h1>
+    <p id="final-score">Score: 0 cm</p>
+    <div id="high-score-entry" style="display: none;">
+        <p id="high-score-msg">NEW HIGH SCORE!</p>
+        <input type="text" id="player-name" placeholder="Enter Your Name" maxlength="15">
+        <br>
+        <button id="btn-save" onclick="handleSave()" style="padding: 10px 25px; font-size: 20px; margin-bottom: 15px;">SAVE SCORE</button>
+    </div>
+    <br>
+    <button onclick="location.reload()">PLAY AGAIN</button>
 </div>
 
 <script>
-// Required for concave shapes (Bananas/Melons)
-Matter.Common.setDecomp(decomp);
-const { Engine, Render, Runner, Bodies, Composite, Body, Events, Vertices } = Matter;
+const decompLib = window.decomp || null;
+Matter.Common.setDecomp(decompLib);
 
+const { Engine, Render, Runner, Bodies, Composite, Body, Events, Vertices } = Matter;
 const engine = Engine.create();
 const world = engine.world;
-const width = window.innerWidth;
-const height = window.innerHeight;
+let width = window.innerWidth;
+let height = window.innerHeight;
 
 let lives = 5;
 let highestY = height - 80;
 let currentFruit = null;
+let nextType = null;
 let activeFruits = [];
+let isGameOver = false;
+let DEBUG_MODE = false; // Set to true to see physics outlines (teal outlines)
+let isGameStarted = false;
+let audioCtx = null;
+let openingTuneInterval = null;
+const assets = {};
+const fruitTypes = ['apple', 'banana', 'blueberry', 'grapes', 'orange', 'pineapple', 'strawberry', 'watermelon'];
+const assetNames = [...fruitTypes, 'bowl', 'bowl_front', 'sparkles', 'title', 'flower', 'flower2', 'splash', 'background'];
+
+// Robust Asset Preloader
+let loadedCount = 0;
+assetNames.forEach(name => {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === assetNames.length) {
+            const startBtn = document.getElementById('btn-start');
+            if (startBtn) {
+                startBtn.innerText = "START GAME";
+                startBtn.disabled = false;
+            }
+        }
+    };
+    img.src = `${name}.png`;
+    assets[name] = img;
+});
 
 const render = Render.create({
     element: document.body,
     engine: engine,
     options: { width, height, wireframes: false, background: 'transparent' }
 });
-
+if (DEBUG_MODE) render.options.wireframes = true; // Enable Matter.js wireframes if in debug mode
 Render.run(render);
 Runner.run(Runner.create(), engine);
+
+// --- Cute Sound Synthesis ---
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playPop() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playBoop(intensity) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    const freq = 150 + (Math.random() * 50);
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(Math.min(0.2, intensity * 0.05), audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playTwinkle() {
+    const notes = [880, 1100, 1320];
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const time = audioCtx.currentTime + (i * 0.05);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0.05, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(time); osc.stop(time + 0.2);
+    });
+}
+
+function playSadBloop() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+}
+
+function playGameOverTune() {
+    const melody = [
+        { f: 392.00, t: 0 },    // G4
+        { f: 329.63, t: 0.2 },  // E4
+        { f: 261.63, t: 0.4 },  // C4
+        { f: 196.00, t: 0.7 }   // G3 (sustained)
+    ];
+    melody.forEach(note => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const time = audioCtx.currentTime + note.t;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(note.f, time);
+        gain.gain.setValueAtTime(0.1, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(time); osc.stop(time + 0.5);
+    });
+}
+
+function playOpeningTune() {
+    if (openingTuneInterval) return;
+    const melody = [
+        { f: 261.63, d: 0.3 }, // C4
+        { f: 329.63, d: 0.3 }, // E4
+        { f: 392.00, d: 0.3 }, // G4
+        { f: 523.25, d: 0.5 }, // C5
+        { f: 349.23, d: 0.3 }, // F4
+        { f: 440.00, d: 0.3 }, // A4
+        { f: 523.25, d: 0.3 }, // C5
+        { f: 392.00, d: 0.5 }  // G4
+    ];
+    let noteIdx = 0;
+    openingTuneInterval = setInterval(() => {
+        if (!audioCtx) return;
+        const note = melody[noteIdx];
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle'; // Soft, flute-like sound
+        osc.frequency.setValueAtTime(note.f, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + note.d);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + note.d);
+        noteIdx = (noteIdx + 1) % melody.length;
+    }, 400);
+}
+
+function stopOpeningTune() {
+    if (openingTuneInterval) {
+        clearInterval(openingTuneInterval);
+        openingTuneInterval = null;
+    }
+}
 
 // --- Precise Shape Definitions ---
 // These coordinates are normalized. We scale them to the fruit size.
 const SHAPES = {
-    '🍉': [ {x:0, y:0}, {x:100, y:0}, {x:90, y:35}, {x:70, y:60}, {x:30, y:60}, {x:10, y:35} ], // Semi-circle
-    '🍌': [ {x:0, y:20}, {x:30, y:0}, {x:70, y:0}, {x:100, y:20}, {x:80, y:40}, {x:50, y:30}, {x:20, y:40} ], // Curved "C"
-    '🍇': [ {x:20, y:0}, {x:80, y:0}, {x:100, y:40}, {x:50, y:100}, {x:0, y:40} ], // Tapered bunch
-    '🍎': [ {x:30, y:0}, {x:70, y:0}, {x:100, y:30}, {x:100, y:70}, {x:70, y:100}, {x:30, y:100}, {x:0, y:70}, {x:0, y:30} ], // Octagon apple
-    '🍍': [ {x:20, y:0}, {x:80, y:0}, {x:100, y:30}, {x:100, y:80}, {x:80, y:100}, {x:20, y:100}, {x:0, y:80}, {x:0, y:30} ]
+    // Coordinates roughly follow the transparency outline of the images
+    'watermelon': [{x:10,y:30}, {x:50,y:10}, {x:90,y:30}, {x:95,y:60}, {x:75,y:90}, {x:25,y:90}, {x:5,y:60}],
+    'pineapple':  [{x:30,y:5}, {x:70,y:5}, {x:90,y:30}, {x:90,y:80}, {x:70,y:95}, {x:30,y:95}, {x:10,y:80}, {x:10,y:30}],
+    'banana':     [{x:85,y:20}, {x:95,y:40}, {x:70,y:85}, {x:40,y:95}, {x:10,y:80}, {x:15,y:50}, {x:45,y:40}], // Robust concave path
+    'grapes':     [{x:20,y:15}, {x:80,y:15}, {x:95,y:40}, {x:50,y:95}, {x:5,y:40}],
+    'apple':      [{x:30,y:15}, {x:70,y:15}, {x:95,y:40}, {x:85,y:85}, {x:15,y:85}, {x:5,y:40}],
+    'orange':     [{x:50,y:5}, {x:85,y:15}, {x:95,y:50}, {x:85,y:85}, {x:50,y:95}, {x:15,y:85}, {x:5,y:50}, {x:15,y:15}],
+    'strawberry': [{x:50,y:95}, {x:90,y:35}, {x:75,y:10}, {x:25,y:10}, {x:10,y:35}],
+    'blueberry':  [{x:50,y:10}, {x:85,y:25}, {x:90,y:50}, {x:85,y:75}, {x:50,y:90}, {x:15,y:75}, {x:10,y:50}, {x:15,y:25}]
 };
 
-function createFruit(x, y) {
-    const emojis = Object.keys(SHAPES);
-    const char = emojis[Math.floor(Math.random() * emojis.length)];
-    const size = char === '🍉' ? 1.2 : (char === '🍌' ? 1.1 : 0.8); // Scaling factors
-    
-    // Scale the custom vertices to the gameplay size
-    const vSet = SHAPES[char].map(p => ({ x: p.x * size, y: p.y * size }));
-    
-    // fromVertices handles the "Concave" shapes like the Banana curve
-    const body = Bodies.fromVertices(x, y, [vSet], {
-        restitution: 0.1,
-        friction: 0.9,
-        density: 0.005,
-        render: { visible: false } 
-    });
+// Scaling order: Watermelon > Pineapple > Banana > Grapes > Apple > Orange > Strawberry > Blueberry
+const FRUIT_SCALES = {
+    watermelon: 1.4,
+    pineapple: 1.2,
+    banana: 1.0,
+    grapes: 0.8,
+    apple: 0.7,
+    orange: 0.6,
+    strawberry: 0.5,
+    blueberry: 0.35
+};
 
-    body.emoji = char;
-    body.displaySize = size * 60;
-    body.isLocked = false;
-    body.flash = 0;
+function createFruit(x, y, type) {
+    const scale = FRUIT_SCALES[type];
+    const img = assets[type];
+    
+    // Ensure ratio is a valid, finite number to prevent vertex corruption
+    const imgWidth = img?.naturalWidth || 100;
+    const imgHeight = img?.naturalHeight || 100;
+    const ratio = (imgWidth > 0 && imgHeight > 0) ? imgWidth / imgHeight : 1;
+
+    // Create and clean vertices
+    let vSet = SHAPES[type].map(p => ({ 
+        x: (p.x - 50) * scale * ratio, 
+        y: (p.y - 50) * scale 
+    }));
+    
+    // Use Vertices.create to ensure the set is valid and cleaned
+    vSet = Vertices.create(vSet);
+
+    let body;
+    try {
+        body = Bodies.fromVertices(x, y, [vSet], {
+            restitution: 0.4,
+            friction: 0.6,
+            density: 0.005,
+            render: { visible: DEBUG_MODE, fillStyle: 'rgba(0, 150, 136, 0.5)', strokeStyle: 'rgba(0, 150, 136, 1)', lineWidth: 2 }
+        });
+    } catch (e) {
+        body = null;
+    }
+
+    // Stricter validation: Check for null, NaN area, or invalid inertia (common cause of physics "explosions")
+    const isInvalid = !body || isNaN(body.area) || body.area <= 0 || 
+                      !Number.isFinite(body.position.x) || isNaN(body.inertia) || body.inertia <= 0;
+
+    if (isInvalid) {
+        body = Bodies.circle(x, y, 40 * scale, {
+            restitution: 0.4,
+            friction: 0.6,
+            density: 0.005,
+            render: { visible: DEBUG_MODE, fillStyle: 'rgba(0, 150, 136, 0.5)', strokeStyle: 'rgba(0, 150, 136, 1)', lineWidth: 2 }
+        });
+    }
+
+    if (body) {
+        body.fruitType = type;
+        body.displaySize = scale * 100;
+        body.isLocked = false;
+        body.flash = 0;
+    }
     return body;
 }
 
-// --- Bowl ---
-const bowlBase = Bodies.rectangle(width/2, height - 40, 240, 20, { isStatic: true, render: { visible: false } });
-const bowlL = Bodies.rectangle(width/2 - 130, height - 100, 20, 150, { isStatic: true, angle: -0.4, render: { visible: false } });
-const bowlR = Bodies.rectangle(width/2 + 130, height - 100, 20, 150, { isStatic: true, angle: 0.4, render: { visible: false } });
+// --- Bowl Setup ---
+const bowlBase = Bodies.rectangle(width/2, height - 50, 220, 20, { isStatic: true, render: { visible: false } });
+const bowlL = Bodies.rectangle(width/2 - 130, height - 110, 30, 160, { isStatic: true, angle: -0.2, render: { visible: false } });
+const bowlR = Bodies.rectangle(width/2 + 130, height - 110, 30, 160, { isStatic: true, angle: 0.2, render: { visible: false } });
 Composite.add(world, [bowlBase, bowlL, bowlR]);
 
+// --- Collision Sounds ---
+Events.on(engine, 'collisionStart', (event) => {
+    event.pairs.forEach(pair => {
+        const speed = pair.collision.depth; // Simple proxy for impact force
+        if (speed > 0.5) {
+            playBoop(speed);
+        }
+    });
+});
+
 function spawn() {
-    currentFruit = createFruit(width / 2, 80);
-    Body.setStatic(currentFruit, true);
-    Composite.add(world, currentFruit);
+    if (isGameOver || !isGameStarted || (currentFruit && Composite.get(world, currentFruit.id, 'body'))) return;
+    if (!nextType) nextType = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
+    
+    const newFruit = createFruit(width / 2, 80, nextType);
+    if (!newFruit) return;
+
+    currentFruit = newFruit;
+    Body.setStatic(newFruit, true);
+    Composite.add(world, newFruit);
+
+    nextType = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
+    updateNextPreview();
+}
+
+function updateNextPreview() {
+    const nextCanvas = document.getElementById('next-canvas');
+    const nx = nextCanvas?.getContext('2d');
+    if (!nx) return;
+    nx.clearRect(0, 0, 100, 100);
+    const img = assets[nextType];
+    if (img && img.complete) {
+        nx.drawImage(img, 10, 10, 80, 80);
+    }
+    // Fallback: If image asset is missing or broken, draw a placeholder
+    else {
+        nx.fillStyle = 'rgba(255, 82, 82, 0.5)'; // Red placeholder
+        nx.fillRect(10, 10, 80, 80);
+    }
 }
 
 // --- Drawing & Game Loop ---
 Events.on(render, 'afterRender', () => {
     const ctx = render.context;
+    if (!ctx) return;
 
-    // Bowl Visual
-    ctx.fillStyle = '#FF80AB';
-    ctx.beginPath();
-    ctx.arc(width/2, height - 70, 150, 0, Math.PI, false);
-    ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.stroke();
+    // 1. Draw the back of the bowl (or the full bowl background)
+    if (assets['bowl'] && assets['bowl'].complete) {
+        ctx.drawImage(assets['bowl'], width/2 - 150, height - 160, 300, 150);
+    }
 
-    // Fruit Visual
+    // 2. Draw all the fruits
     Composite.allBodies(world).forEach(body => {
-        if (body.emoji) {
+        if (body.fruitType) {
+            // Safety check: Don't attempt to draw bodies with corrupted physics data
+            if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y)) return;
+
             ctx.save();
             ctx.translate(body.position.x, body.position.y);
             ctx.rotate(body.angle);
             
-            if (body.flash > 0) {
-                ctx.shadowBlur = body.flash;
-                ctx.shadowColor = "white";
-                body.flash -= 2;
-            }
+            if (!DEBUG_MODE) { // Only draw custom image if not in debug mode
+                const img = assets[body.fruitType];
+                if (img && img.complete && img.naturalWidth > 0) {
+                    const ratio = img.naturalWidth / img.naturalHeight;
+                    const drawHeight = body.displaySize;
+                    const drawWidth = Number.isFinite(ratio) ? drawHeight * ratio : drawHeight;
 
-            ctx.font = `${body.displaySize * 1.5}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(body.emoji, 0, 0);
+                    if (body.flash > 0) { 
+                        ctx.shadowBlur = Math.min(body.flash, 50);
+                        ctx.shadowColor = "white";
+                        body.flash -= 2;
+                    }
+                    ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
+                    
+                    if (body.flash > 10 && assets['sparkles'] && assets['sparkles'].complete) {
+                        ctx.drawImage(assets.sparkles, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
+                    }
+                } else {
+                    // Fallback: If image asset is missing or broken, draw a placeholder circle
+                    ctx.beginPath();
+                    ctx.arc(0, 0, body.displaySize / 3, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 82, 82, 0.5)';
+                    ctx.fill();
+                }
+            }
             ctx.restore();
+            ctx.shadowBlur = 0;
         }
     });
+
+    // 3. Draw the front rim of the bowl (The "Overhang")
+    if (assets['bowl_front'] && assets['bowl_front'].complete) {
+        ctx.drawImage(assets['bowl_front'], width/2 - 150, height - 160, 300, 150);
+    }
 });
 
 Events.on(engine, 'afterUpdate', () => {
-    activeFruits.forEach((f, i) => {
-        if (f.speed < 0.2 && f.angularSpeed < 0.01 && f.position.y < height - 80) {
+    if (isGameOver || !isGameStarted) return;
+
+    // Safety: check current hovering fruit for corruption before it breaks the simulation
+    if (currentFruit && (!Number.isFinite(currentFruit.position.x) || isNaN(currentFruit.inertia))) {
+        const toRemove = currentFruit;
+        currentFruit = null;
+        Composite.remove(world, toRemove);
+        // Delay spawn to prevent rapid "cycling" if corruption persists
+        setTimeout(spawn, 50);
+    }
+
+    for (let i = activeFruits.length - 1; i >= 0; i--) {
+        const f = activeFruits[i];
+        // Safety: Remove fruits that have corrupted physics (NaN positions or invalid inertia)
+        if (!Number.isFinite(f.position.x) || !Number.isFinite(f.position.y) || isNaN(f.inertia)) {
+            Composite.remove(world, f);
+            activeFruits.splice(i, 1);
+            continue;
+        }
+
+        // Stricter settling threshold to ensure overlaps are resolved before locking
+        if (f.speed < 0.1 && f.angularSpeed < 0.01 && f.position.y < height - 60) {
             if (!f.isLocked) {
                 f.isLocked = true;
                 f.flash = 40;
+                playTwinkle();
                 Body.setStatic(f, true);
-                activeFruits.splice(i, 1);
-                
-                if (f.bounds.min.y < highestY) {
-                    highestY = f.bounds.min.y;
-                    document.getElementById('height').innerText = `${((height - 80 - highestY) / 10).toFixed(1)} cm`;
+                const currentTop = f.bounds ? f.bounds.min.y : f.position.y;
+                if (Number.isFinite(currentTop) && currentTop < highestY) {
+                    highestY = currentTop;
+                    const score = Math.max(0, (height - 80 - highestY) / 10).toFixed(1);
+                    document.getElementById('height').innerText = `${score} cm`;
                 }
+                activeFruits.splice(i, 1);
             }
-        }
-        if (f.position.y > height + 100) {
+        } else if (f.position.y > height + 100) {
             Composite.remove(world, f);
             activeFruits.splice(i, 1);
             lives--;
-            document.getElementById('lives').innerText = "❤️".repeat(lives);
-            if (lives <= 0) location.reload();
+            playSadBloop();
+            document.getElementById('lives').innerText = "❤️".repeat(Math.max(0, lives));
+            if (lives <= 0) {
+                isGameOver = true;
+                stopOpeningTune();
+                const scoreVal = document.getElementById('height').innerText;
+                document.getElementById('final-score').innerText = `Final Height: ${scoreVal}`;
+                document.getElementById('game-over').style.display = 'block';
+                
+                const score = parseFloat(scoreVal);
+                let scores = JSON.parse(localStorage.getItem('fruitStackScores') || '[]');
+                if (scores.length < 5 || score > scores[scores.length - 1].score) {
+                    document.getElementById('high-score-entry').style.display = 'block';
+                    document.getElementById('high-score-msg').style.display = 'block';
+                }
+                
+                playGameOverTune();
+            }
         }
-    });
+    }
 });
 
-const drop = () => {
-    if (!currentFruit) return;
+// Handle window resize to keep game elements centered
+window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    render.canvas.width = width;
+    render.canvas.height = height;
+    render.options.width = width;
+    render.options.height = height;
+    
+    Body.setPosition(bowlBase, { x: width/2, y: height - 50 });
+    Body.setPosition(bowlL, { x: width/2 - 130, y: height - 110 });
+    Body.setPosition(bowlR, { x: width/2 + 130, y: height - 110 });
+});
+
+function drop() {
+    if (!currentFruit || !isGameStarted || isGameOver) return;
+    playPop();
     Body.setStatic(currentFruit, false);
+    
+    // Add random spin and a slight horizontal nudge for unpredictability
+    const randomSpin = (Math.random() - 0.5) * 0.2;
+    const randomNudge = (Math.random() - 0.5) * 2;
+    Body.setAngularVelocity(currentFruit, randomSpin);
+    Body.setVelocity(currentFruit, { x: randomNudge, y: 0 });
+
     activeFruits.push(currentFruit);
     currentFruit = null;
     setTimeout(spawn, 1200);
-};
+}
 
-window.addEventListener('mousemove', (e) => { if (currentFruit) Body.setPosition(currentFruit, { x: e.clientX, y: 80 }); });
+window.addEventListener('mousemove', (e) => { 
+    if (currentFruit && isGameStarted) {
+        const minDropX = width / 2 - 95;
+        const maxDropX = width / 2 + 95;
+        // This keeps the fruit "stuck" within the edges of the bowl
+        const x = Math.max(minDropX, Math.min(maxDropX, e.clientX));
+        Body.setPosition(currentFruit, { x, y: 80 }); 
+    }
+});
 window.addEventListener('mousedown', drop);
 window.addEventListener('touchstart', (e) => { e.preventDefault(); drop(); });
 
-spawn();
+// --- Splash Logic ---
+document.getElementById('splash-screen').addEventListener('click', () => {
+    initAudio();
+}, { once: true });
+
+document.getElementById('btn-start').onclick = () => {
+    initAudio();
+    isGameStarted = true;
+    document.getElementById('splash-screen').style.display = 'none';
+    spawn();
+    playOpeningTune();
+};
+
+document.getElementById('btn-how').onclick = () => {
+    document.getElementById('how-to-play-screen').style.display = 'block';
+};
+
+document.getElementById('btn-leaderboard').onclick = showLeaderboard;
+
+function handleSave() {
+    const name = document.getElementById('player-name').value.trim() || "Anonymous";
+    const scoreVal = parseFloat(document.getElementById('height').innerText);
+    
+    saveScore(name, scoreVal);
+    document.getElementById('high-score-entry').style.display = 'none';
+    showLeaderboard();
+}
+
+function saveScore(name, score) {
+    let scores = JSON.parse(localStorage.getItem('fruitStackScores') || '[]');
+    scores.push({ name, score: score });
+    scores.sort((a, b) => b.score - a.score);
+    scores = scores.slice(0, 5);
+    localStorage.setItem('fruitStackScores', JSON.stringify(scores));
+}
+
+function showLeaderboard() {
+    const list = document.getElementById('leaderboard-list');
+    const scores = JSON.parse(localStorage.getItem('fruitStackScores') || '[]');
+    list.innerHTML = scores.length ? scores.map((s, i) => 
+        `<div class="leaderboard-entry"><span>${i+1}. ${s.name}</span><span>${s.score.toFixed(1)} cm</span></div>`
+    ).join('') : "<div style='text-align:center'>No scores yet!</div>";
+    document.getElementById('leaderboard-screen').style.display = 'block';
+}
 </script>
 </body>
 </html>
